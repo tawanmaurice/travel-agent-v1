@@ -77,7 +77,7 @@ Add these to terraform.tfvars:
 aws_region      = "us-east-1"
 google_api_key  = "YOUR_GOOGLE_API_KEY"
 google_cx       = "YOUR_GOOGLE_CX"
-report_email    = "tawanmaurice@gmail.com"
+report_email    = "tawanxxx@gmail.com"
 
 
 ⚠️ Do NOT commit real API keys to GitHub.
@@ -124,7 +124,7 @@ Timestamp
 
 Email identity must be verified in SES:
 
-tawanmaurice@gmail.com
+tawanxxx@gmail.com
 
 
 (Already done in this project)
@@ -156,24 +156,3 @@ Same URL twice → ONE record (upsert)
 
 New URL → inserted
 
-⚙️ Default Search Queries
-"long term rental" "apartment" "Mexico" -airbnb
-"furnished" "short term rental" "digital nomad"
-"remote work housing" "monthly rentals"
-
-
-Will be updated later to include Philippines, Brazil, and other locations.
-
-💡 Roadmap (what's next)
-
-🌎 Add country-specific query rotation
-
-🧭 Add sentiment / ranking via Claude or GPT
-
-📈 Add SES daily digests with 10 best links
-
-📁 Export results to CSV automatically
-
-🤖 Build a dating agent variant
-
-📬 Deploy the “50 agents email outreach system”
