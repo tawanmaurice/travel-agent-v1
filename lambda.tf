@@ -11,7 +11,9 @@ resource "aws_lambda_function" "travel_agent" {
   filename         = "lambda.zip"
   source_code_hash = filebase64sha256("lambda.zip")
 
-  timeout     = 30
+  # Headless scraping is slower than simple Google calls,
+  # so we give it more time.
+  timeout     = 120
   memory_size = 512
 
   #############################
@@ -23,6 +25,12 @@ resource "aws_lambda_function" "travel_agent" {
       GOOGLE_CX      = var.google_cx
       TABLE_NAME     = aws_dynamodb_table.travel_agent_leads.name
       REPORT_EMAIL   = var.report_email
+
+      # === NEW: headless scraping config ===
+      HEADLESS_API_URL = var.headless_api_url   # e.g. https://api.scraperapi.com
+      HEADLESS_API_KEY = var.headless_api_key
+      HEADLESS_RENDER  = "true"
+      HEADLESS_TIMEOUT = "60"
     }
   }
 }

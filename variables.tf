@@ -43,3 +43,29 @@ variable "schedule_expression_evening" {
   description = "CloudWatch schedule expression for the evening travel-agent run"
   type        = string
 }
+
+########################
+# Headless scraping API (NEW)
+########################
+
+variable "headless_api_url" {
+  description = "Base URL for headless scraping provider (e.g. https://api.scraperapi.com)"
+  type        = string
+}
+
+variable "headless_api_key" {
+  description = "API key for headless scraping provider"
+  type        = string
+}
+
+variable "headless_render" {
+  description = "Whether the headless API should render JavaScript (true/false)"
+  type        = string
+  default     = "true"
+}
+
+variable "headless_timeout" {
+  description = "Timeout (seconds) for headless API requests"
+  type        = number
+  default     = 60
+}

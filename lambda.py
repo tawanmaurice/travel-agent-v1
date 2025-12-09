@@ -32,28 +32,25 @@ table = dynamodb.Table(TABLE_NAME)
 ses_client = boto3.client("ses")
 
 # ---------------------------------------------------
-# Travel search definitions (Philippines-focused)
+# Travel search definitions (Pampanga + Subic only)
 # ---------------------------------------------------
-# Philippines-focused searches, biased to Cebu / Angeles / Subic
 TRAVEL_QUERIES = [
-    # --- CEBU (3 queries) ---
-    '"apartment for rent" "Cebu City" "for rent" "long term" "Philippines" -airbnb',
-    '"furnished condo for rent" "Cebu IT Park" "monthly" "Cebu City" -airbnb',
-    '"long term rental" "Cebu City" "furnished apartment" "monthly" -airbnb',
+    # --- ANGELES CITY / PAMPANGA ONLY ---
+    '"apartment for rent" "Angeles City" "Pampanga" "long term" "Philippines" -airbnb -filetype:pdf',
+    '"furnished condo for rent" "Angeles City" "monthly" "near Clark" "Pampanga" -airbnb -filetype:pdf',
+    '"apartment for rent" "Mabalacat" "Pampanga" "long term" -airbnb -filetype:pdf',
+    '"apartment for rent" "Clark Freeport" "Pampanga" "long term" -airbnb -filetype:pdf',
 
-    # --- ANGELES CITY / CLARK / PAMPANGA (3 queries) ---
-    '"apartment for rent" "Angeles City" "Pampanga" "for rent" "long term" -airbnb',
-    '"furnished condo for rent" "Angeles City" "monthly" "near Clark" -airbnb',
-    '"long term rental" "Angeles City" "furnished apartment" "monthly" -airbnb',
-
-    # --- SUBIC / OLONGAPO / SUBIC BAY (3 queries) ---
-    '"apartment for rent" "Subic" "Zambales" "for rent" "long term" -airbnb',
-    '"condo for rent" "Subic Bay Freeport Zone" "monthly" "furnished" -airbnb',
-    '"apartment for rent" "Olongapo" "Subic" "for rent" "furnished" -airbnb',
+    # --- SUBIC / OLONGAPO ONLY ---
+    '"apartment for rent" "Subic" "Zambales" "long term" "for rent" -airbnb -filetype:pdf',
+    '"condo for rent" "Subic Bay Freeport Zone" "monthly" "furnished" -airbnb -filetype:pdf',
+    '"apartment for rent" "Olongapo" "Subic" "furnished" "monthly" -airbnb -filetype:pdf',
+    '"apartment for rent" "Olongapo City" "Zambales" "long term" -airbnb -filetype:pdf',
 ]
 
-# Domains we never want (pure social/junk for this use case)
+# Domains we never want (social OR academic/doc junk)
 JUNK_DOMAINS = {
+    # Social / general
     "facebook.com",
     "m.facebook.com",
     "twitter.com",
@@ -63,7 +60,25 @@ JUNK_DOMAINS = {
     "pinterest.com",
     "youtube.com",
     "www.youtube.com",
+
+    # Academic / document repositories
+    "academia.edu",
+    "evols.library.manoa.hawaii.edu",
+    "researchgate.net",
+    "scribd.com",
+    "zenodo.org",
 }
+
+# File extensions to skip entirely
+BAD_EXTENSIONS = [
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".ppt",
+    ".pptx",
+    ".xls",
+    ".xlsx",
+]
 
 # ---------------------------------------------------
 # Helpers
@@ -88,7 +103,6 @@ def extract_emails(text: str):
     if not text:
         return []
     emails = set(EMAIL_REGEX.findall(text))
-    # Filter obvious garbage if needed later
     return sorted(emails)
 
 
@@ -103,7 +117,16 @@ def google_search(query: str):
         "q": query,
         "num": 10,
     }
-    resp = requests.get("https://www.googleapis.com/customsearch/v1", params=params, timeout=10)
+    try:
+        resp = requests.get(
+            "https://www.googleapis.com/customsearch/v1",
+            params=params,
+            timeout=10,
+        )
+    except Exception as e:
+        logger.error("Google search request failed: %s", e)
+        return []
+
     if resp.status_code != 200:
         logger.error("Google search failed (%s): %s", resp.status_code, resp.text)
         return []
@@ -119,12 +142,22 @@ def make_lead_id(url: str, query: str) -> str:
     return h.hexdigest()
 
 
-def upsert_lead(item, query: str, agent_name: str = "travel_agent_v1"):
+def is_bad_filetype(url: str) -> bool:
+    low = url.lower()
+    return any(low.endswith(ext) for ext in BAD_EXTENSIONS)
+
+
+def upsert_lead(item, query: str, agent_name: str = "travel_agent_v2_noheadless"):
     url = item.get("link")
     title = item.get("title", "")
     snippet = item.get("snippet", "")
 
     if not url:
+        return None
+
+    # Skip PDFs / Office docs
+    if is_bad_filetype(url):
+        logger.info("Skipping file-type URL (pdf/doc/etc): %s", url)
         return None
 
     domain = normalize_domain(url)
@@ -133,11 +166,13 @@ def upsert_lead(item, query: str, agent_name: str = "travel_agent_v1"):
         return None
 
     if domain in JUNK_DOMAINS:
-        logger.info("Skipping junk/social domain: %s", domain)
+        logger.info("Skipping junk/academic/social domain: %s (url=%s)", domain, url)
         return None
 
-    # Extract potential emails from snippet only (we're being conservative)
-    emails = extract_emails(snippet)
+    # Emails from snippet (Google result) ONLY – no headless
+    snippet_emails = extract_emails(snippet)
+    page_emails = []
+    all_emails = snippet_emails  # same list, kept for compatibility
 
     lead_id = make_lead_id(url, query)
     now_ts = int(time.time())
@@ -150,15 +185,18 @@ def upsert_lead(item, query: str, agent_name: str = "travel_agent_v1"):
         "domain": domain,
         "source_query": query,
         "agent_name": agent_name,
-        "emails": emails,
+        "emails": all_emails,
+        "snippet_emails": snippet_emails,
+        "page_emails": page_emails,
         "created_at": now_ts,
     }
 
     table.put_item(Item=item_to_save)
     logger.info(
-        "Upserted lead %s for URL=%s",
+        "Upserted lead %s for URL=%s (emails from snippet: %d)",
         lead_id,
         url,
+        len(snippet_emails),
     )
     return item_to_save
 
@@ -176,9 +214,10 @@ def send_summary_email(leads, total_saved: int):
         logger.info("No leads collected; skipping summary email.")
         return
 
-    # Build a short text summary (cap at 20 URLs so email isn't huge)
     lines = []
-    lines.append("Travel agent just completed a Philippines-focused run (Cebu / Angeles / Subic).")
+    lines.append(
+        "Travel agent v2 (no headless, Pampanga + Subic only) just completed a run."
+    )
     lines.append(f"Total records saved this run: {total_saved}")
     lines.append("")
     lines.append("Sample URLs from this run:")
@@ -186,11 +225,13 @@ def send_summary_email(leads, total_saved: int):
     for lead in leads[:20]:
         url = lead.get("url", "N/A")
         title = lead.get("title", "").strip()
-        lines.append(f"- {title[:80]} ({url})")
+        emails = lead.get("emails", [])
+        email_info = f" | emails: {', '.join(emails[:3])}" if emails else ""
+        lines.append(f"- {title[:80]} ({url}){email_info}")
 
     body_text = "\n".join(lines)
 
-    subject = "Travel Agent Report - PH (Cebu / Angeles / Subic) Rentals"
+    subject = "Travel Agent Report - Pampanga + Subic (v2, no headless)"
 
     try:
         response = ses_client.send_email(
@@ -214,9 +255,10 @@ def send_summary_email(leads, total_saved: int):
 # Lambda handler
 # ---------------------------------------------------
 def lambda_handler(event, context):
-    logger.info("Travel agent scanning started.")
+    logger.info("Travel agent v2 (no headless, Pampanga + Subic) scanning started.")
     total_saved = 0
     leads_this_run = []
+    seen_urls = set()  # avoid saving duplicates in a single run
 
     for query in TRAVEL_QUERIES:
         items = google_search(query)
@@ -226,13 +268,21 @@ def lambda_handler(event, context):
             len(items),
         )
         for item in items:
-            lead = upsert_lead(item, query, agent_name="travel_agent_v1")
+            url = item.get("link")
+            if not url:
+                continue
+            if url in seen_urls:
+                logger.info("Skipping duplicate URL in this run: %s", url)
+                continue
+            seen_urls.add(url)
+
+            lead = upsert_lead(item, query, agent_name="travel_agent_v2_noheadless")
             if lead:
                 total_saved += 1
                 leads_this_run.append(lead)
 
     logger.info(
-        "Travel agent completed. Saved %d records.",
+        "Travel agent v2 (no headless, Pampanga + Subic) completed. Saved %d records.",
         total_saved,
     )
 
@@ -243,7 +293,7 @@ def lambda_handler(event, context):
         "statusCode": 200,
         "body": json.dumps(
             {
-                "message": "Travel agent completed.",
+                "message": "Travel agent v2 (no headless, Pampanga + Subic) completed.",
                 "saved": total_saved,
             }
         ),
