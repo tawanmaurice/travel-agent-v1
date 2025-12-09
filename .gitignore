@@ -1,69 +1,36 @@
-############################################
-# Terraform
-############################################
-
-# Local Terraform directories
-.terraform/
-.terraform.lock.hcl
-
-# Terraform state (NEVER commit state)
-terraform.tfstate
-terraform.tfstate.*
-*.tfstate
-*.tfstate.*
-
-# Terraform plan files
-tfplan
-*.tfplan
-
-# Local configuration (NEVER commit secrets)
-terraform.tfvars
-*.tfvars
-*.auto.tfvars
-
-############################################
-# Lambda build / Python packaging
-############################################
-
-# Build folders
-build/
-build-lambda/
-package/
-dist/
+# === PYTHON ===
 __pycache__/
-
-# Zip files (NEVER commit bundled Lambda)
-*.zip
-lambda.zip
-
-# Python virtual environments
-venv/
-env/
-.venv/
-.env/
-
-# Python cache
 *.pyc
 *.pyo
 *.pyd
+*.DS_Store
 
-############################################
-# Logs / Debug
-############################################
-*.log
-logs/
-tmp/
+# === LAMBDA BUILD ARTIFACTS ===
+build-lambda/
+package/
+lambda.zip
 
-############################################
-# VS Code settings
-############################################
-.vscode/
-.settings/
-.idea/
+# === VENV ===
+.venv/
+env/
+venv/
 
-############################################
-# OS generated files
-############################################
-.DS_Store
+# === TERRAFORM ===
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan
+
+# === CREDENTIALS / ENV VARS ===
+*.tfvars
+*.env
+.env.local
+.env.*
+secrets.json
+
+# === OS / EDITOR JUNK ===
 Thumbs.db
-desktop.ini
+*.log

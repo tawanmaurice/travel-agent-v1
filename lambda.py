@@ -32,12 +32,24 @@ table = dynamodb.Table(TABLE_NAME)
 ses_client = boto3.client("ses")
 
 # ---------------------------------------------------
-# Travel search definitions
+# Travel search definitions (Philippines-focused)
 # ---------------------------------------------------
+# Philippines-focused searches, biased to Cebu / Angeles / Subic
 TRAVEL_QUERIES = [
-    '"short term rental" "1 month" "Mexico" -airbnb',
-    '"furnished apartment" "monthly rental" "Mexico" -airbnb',
-    '"long term rental" "apartment" "Mexico" -airbnb',
+    # --- CEBU (3 queries) ---
+    '"apartment for rent" "Cebu City" "for rent" "long term" "Philippines" -airbnb',
+    '"furnished condo for rent" "Cebu IT Park" "monthly" "Cebu City" -airbnb',
+    '"long term rental" "Cebu City" "furnished apartment" "monthly" -airbnb',
+
+    # --- ANGELES CITY / CLARK / PAMPANGA (3 queries) ---
+    '"apartment for rent" "Angeles City" "Pampanga" "for rent" "long term" -airbnb',
+    '"furnished condo for rent" "Angeles City" "monthly" "near Clark" -airbnb',
+    '"long term rental" "Angeles City" "furnished apartment" "monthly" -airbnb',
+
+    # --- SUBIC / OLONGAPO / SUBIC BAY (3 queries) ---
+    '"apartment for rent" "Subic" "Zambales" "for rent" "long term" -airbnb',
+    '"condo for rent" "Subic Bay Freeport Zone" "monthly" "furnished" -airbnb',
+    '"apartment for rent" "Olongapo" "Subic" "for rent" "furnished" -airbnb',
 ]
 
 # Domains we never want (pure social/junk for this use case)
@@ -166,7 +178,7 @@ def send_summary_email(leads, total_saved: int):
 
     # Build a short text summary (cap at 20 URLs so email isn't huge)
     lines = []
-    lines.append(f"Travel agent just completed a run.")
+    lines.append("Travel agent just completed a Philippines-focused run (Cebu / Angeles / Subic).")
     lines.append(f"Total records saved this run: {total_saved}")
     lines.append("")
     lines.append("Sample URLs from this run:")
@@ -178,7 +190,7 @@ def send_summary_email(leads, total_saved: int):
 
     body_text = "\n".join(lines)
 
-    subject = "Travel Agent Report - New Leads Collected"
+    subject = "Travel Agent Report - PH (Cebu / Angeles / Subic) Rentals"
 
     try:
         response = ses_client.send_email(
