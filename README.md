@@ -1,7 +1,7 @@
 Travel Agent V1 — Google Scraper + DynamoDB + SES Email Reports
 
 Travel Agent V1 is an automated travel lead generator built on AWS.
-It searches the web for long-term rental opportunities (ideal for digital nomads), extracts relevant URLs, stores them in DynamoDB, and sends a summary email report using AWS SES.
+It searches the web for long-term rental opportunities (ideal for people moving to a new city), extracts relevant URLs, stores them in DynamoDB, and sends a summary email report using AWS SES.
 
 This version is designed for daily, automated travel lead discovery with zero manual work.
 
